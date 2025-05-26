@@ -30,11 +30,12 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 EMAIL_FROM = os.getenv("EMAIL_FROM")
-EMAIL_TO = os.getenv("EMAIL_TO")
+# 支持多个收件人邮箱，用逗号分隔
+EMAIL_TO = [email.strip() for email in os.getenv("EMAIL_TO", "").split(",") if email.strip()]
 
 PAPERS_DIR = Path("./papers")
 CONCLUSION_FILE = Path("./conclusion.md")
-CATEGORIES = ["cs.AR"]
+CATEGORIES = ["cs.AR", "cs.AI"]
 MAX_PAPERS = 50  # 设置为1以便快速测试
 
 # 配置OpenAI API用于DeepSeek
@@ -186,100 +187,26 @@ def delete_pdf(pdf_path):
         logger.error(f"删除PDF文件失败 {pdf_path}: {str(e)}")
 
 def send_email(content):
-    """发送邮件"""
-    if not all([SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, EMAIL_FROM, EMAIL_TO]):
+    """发送邮件，支持多个收件人"""
+    if not all([SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, EMAIL_FROM]) or not EMAIL_TO:
         logger.error("邮件配置不完整，跳过发送邮件")
         return
 
     try:
         msg = MIMEMultipart()
         msg['From'] = EMAIL_FROM
-        msg['To'] = EMAIL_TO
+        msg['To'] = ", ".join(EMAIL_TO)
         msg['Subject'] = f"ArXiv论文分析报告 - {datetime.datetime.now().strftime('%Y-%m-%d')}"
 
         # 使用HTML模板
         html_template = """
         <html>
         <head>
-            <meta charset="UTF-8">
-            <style>
-                body {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                    line-height: 1.6;
-                    max-width: 1000px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    background-color: #f5f5f5;
-                }
-                .container {
-                    background-color: white;
-                    padding: 30px;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                }
-                h1 {
-                    color: #2c3e50;
-                    border-bottom: 2px solid #3498db;
-                    padding-bottom: 10px;
-                    margin-bottom: 30px;
-                }
-                h2 {
-                    color: #34495e;
-                    margin-top: 40px;
-                    padding-bottom: 8px;
-                    border-bottom: 1px solid #eee;
-                }
-                h3 {
-                    color: #2980b9;
-                    margin-top: 30px;
-                }
-                .paper-info {
-                    background-color: #f8f9fa;
-                    padding: 15px;
-                    border-left: 4px solid #3498db;
-                    margin-bottom: 20px;
-                }
-                .paper-info p {
-                    margin: 5px 0;
-                }
-                .paper-info strong {
-                    color: #2c3e50;
-                }
-                a {
-                    color: #3498db;
-                    text-decoration: none;
-                }
-                a:hover {
-                    text-decoration: underline;
-                }
-                hr {
-                    border: none;
-                    border-top: 1px solid #eee;
-                    margin: 30px 0;
-                }
-                .section {
-                    margin-bottom: 20px;
-                }
-                .section h4 {
-                    color: #2c3e50;
-                    margin-bottom: 10px;
-                }
-                pre {
-                    background-color: #f8f9fa;
-                    padding: 15px;
-                    border-radius: 4px;
-                    overflow-x: auto;
-                }
-                code {
-                    font-family: Consolas, Monaco, 'Courier New', monospace;
-                    background-color: #f8f9fa;
-                    padding: 2px 4px;
-                    border-radius: 3px;
-                }
-            </style>
+            <meta charset=\"UTF-8\">
+            <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;line-height:1.6;max-width:1000px;margin:0 auto;padding:20px;background-color:#f5f5f5;}.container{background-color:white;padding:30px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}h1{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px;margin-bottom:30px;}h2{color:#34495e;margin-top:40px;padding-bottom:8px;border-bottom:1px solid #eee;}h3{color:#2980b9;margin-top:30px;}.paper-info{background-color:#f8f9fa;padding:15px;border-left:4px solid #3498db;margin-bottom:20px;}.paper-info p{margin:5px 0;}.paper-info strong{color:#2c3e50;}a{color:#3498db;text-decoration:none;}a:hover{text-decoration:underline;}hr{border:none;border-top:1px solid #eee;margin:30px 0;}.section{margin-bottom:20px;}.section h4{color:#2c3e50;margin-bottom:10px;}pre{background-color:#f8f9fa;padding:15px;border-radius:4px;overflow-x:auto;}code{font-family:Consolas,Monaco,'Courier New',monospace;background-color:#f8f9fa;padding:2px 4px;border-radius:3px;}</style>
         </head>
         <body>
-            <div class="container">
+            <div class=\"container\">
                 {{ content | replace("###", "<h2>") | replace("##", "<h1>") | replace("**", "<strong>") | safe }}
             </div>
         </body>
@@ -300,7 +227,7 @@ def send_email(content):
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
 
-        logger.info("邮件发送成功")
+        logger.info(f"邮件发送成功，收件人: {', '.join(EMAIL_TO)}")
     except Exception as e:
         logger.error(f"发送邮件失败: {str(e)}")
 
